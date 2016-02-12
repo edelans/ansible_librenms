@@ -1,0 +1,10 @@
+---
+
+- name: Server Bootstrap
+  hosts: server
+  sudo: True
+  gather_facts: True
+  roles:
+    - apache2
+    - mysql
+    - librenms

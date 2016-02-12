@@ -1,0 +1,186 @@
+---
+# playbook crafted from http://docs.librenms.org/Installation/Installation-(Debian-Ubuntu)/
+
+################
+# Base packages
+################
+
+- name: apt - install basic system packages
+  sudo: yes
+  apt: pkg={{item}} state=latest update-cache=yes
+  with_items:
+    - libapache2-mod-php5
+    - php5-cli
+    - php5-mysql
+    - php5-gd
+    - php5-snmp
+    - php-pear
+    - php5-curl
+    - snmp
+    - graphviz
+    - php5-mcrypt
+    - php5-json
+    - fping
+    - imagemagick
+    - whois
+    - mtr-tiny
+    - nmap
+    - python-mysqldb
+    - snmpd
+    - php-net-ipv4
+    - php-net-ipv6
+    - rrdtool
+
+- name: Enable php module
+  shell: php5enmod mcrypt
+
+- name: Create librenms user
+  user: name=librenms group=www-data shell=/bin/bash home=/opt/librenms state=present system=yes createhome=no
+
+#################
+# Download
+#################
+
+# - name: download librenms source
+#   git: repo=https://github.com/librenms/librenms.git dest=/tmp/librenms update=no
+#   sudo_user: librenms
+
+
+
+# #################
+# # General
+# #################
+
+- name: Make sure rrd directories exist
+  sudo: true
+  file:
+    path: /opt/librenms/rrd
+    state: directory
+    owner: librenms
+    group: librenms
+    mode: 0775
+    recurse: yes
+
+- name: Create logs directory
+  sudo: true
+  file:
+    path: /opt/librenms/logs
+    state: directory
+    owner: librenms
+    group: librenms
+    recurse: yes
+
+- name: Configure logrotate for LibreNMS
+  template:
+    src: 'etc/logrotate.d/librenms.j2'
+    dest: '/etc/logrotate.d/librenms'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+
+- name: Copy config file
+  template:
+    src: config.php.j2
+    dest: /opt/librenms/config.php
+    owner: librenms
+    group: librenms
+    mode: 0600
+
+- name: Enable non-free MIBs support
+  lineinfile:
+    dest: '/etc/snmp/snmp.conf'
+    state: 'present'
+    regexp: 'mibs\s:'
+    line: '#mibs :'
+
+
+# #################
+# # Database
+# #################
+
+- name: Create librenms database
+  mysql_db:
+    name: librenms
+    state: present
+    encoding: utf8
+    collation: utf8_general_ci
+
+- name: Grant privileges on observium db
+  mysql_user:
+    name: "{{ librenms_db.db_user}}"
+    password: "{{ librenms_db.db_pass}}"
+    priv: "librenms.*:ALL"
+    state: present
+    host: "{{ librenms_db.db_host}}"
+
+- name: Initialise the database
+  sudo: yes
+  sudo_user: librenms
+  command: cd /opt/librenms && php build-base.php
+
+
+
+#################
+# Apache
+#################
+
+- name: Add apache vhost configuration
+  copy:
+    src: etc/apache2/sites-available/librenms.conf
+    dest: /etc/apache2/sites-available/librenms.conf
+    owner: root
+    group: root
+    mode: 644
+  notify: Restart apache
+
+- name: Enable site on apache config
+  shell: a2ensite librenms.conf
+  notify: Restart apache
+  register: apache_cmd
+  changed_when: apache_cmd.stdout.endswith(' already enabled') == false
+
+- name: Enable apache module
+  shell: a2enmod rewrite
+  notify: Restart apache
+  register: apache_cmd
+  changed_when: apache_cmd.stdout.endswith(' already enabled') == false
+
+
+#################
+# initial data
+#################
+
+- name: add an admin user
+  sudo: yes
+  sudo_user: librenms
+  args:
+    chdir: /opt/librenms
+  shell: php adduser.php {{item.username}} {{item.password}} {{item.level}} {{item.email}}
+  with_items: librenms_user
+
+- name: add hosts
+  sudo: yes
+  sudo_user: librenms
+  args:
+    chdir: /opt/librenms
+  shell: php addhost.php {{item.fqdn}} {{item.community}} {{item.snmp_version}}
+  with_items: librenms_hosts
+
+- name: launch discovery
+  sudo: yes
+  sudo_user: librenms
+  args:
+    chdir: /opt/librenms
+  shell: php discovery.php -h all
+
+#################
+# cronjobs
+#################
+
+- name: Configure cron tasks
+  template:
+    src: 'etc/cron.d/librenms.j2'
+    dest: '/etc/cron.d/librenms'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'

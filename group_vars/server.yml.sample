@@ -1,0 +1,41 @@
+---
+
+###############
+# librenms role
+###############
+
+librenms_db:
+    db_host: localhost
+    db_user: librenms
+    db_pass: password
+
+
+librenms_domain_name: librenms.domain.com
+
+# for web-interface authentication :
+librenms_user:
+-   username: admin
+    password: admin
+    level: 10
+    email: your_email
+
+librenms_snmp_version: v2c
+librenms_snmp_communities: [ 'public' ]
+
+
+librenms_hosts:
+-   fqdn: localhost
+    community: public
+    snmp_version: v2c
+
+
+###############
+# mysql role
+###############
+
+mysql_root_password: password
+
+
+###############
+# apache2 role
+###############

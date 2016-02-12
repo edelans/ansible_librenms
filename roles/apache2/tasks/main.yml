@@ -1,0 +1,16 @@
+---
+
+- name: Install Apache2 latest version
+  apt:
+    pkg: "apache2"
+    state: "latest"
+
+- name: Disable apache sites
+  shell:
+    a2dissite {{ item }}
+  register: apache_cmd
+  changed_when: apache_cmd.stdout.endswith(' already disabled') == false
+  notify: Restart apache
+  with_items:
+      - 000-default
+      - default-ssl
