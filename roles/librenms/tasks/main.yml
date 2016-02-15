@@ -6,7 +6,7 @@
 ################
 
 - name: apt - install basic system packages
-  sudo: yes
+  become: yes
   apt: pkg={{item}} state=latest update-cache=yes
   with_items:
     - libapache2-mod-php5
@@ -43,14 +43,14 @@
 
 - name: download librenms source
   git: repo=https://github.com/librenms/librenms.git dest=/tmp/librenms update=no
-  sudo_user: librenms
+  become_user: librenms
 
 # #################
 # # General
 # #################
 
 - name: Make sure rrd directories exist
-  sudo: true
+  become: true
   file:
     path: /opt/librenms/rrd
     state: directory
@@ -60,7 +60,7 @@
     recurse: yes
 
 - name: Make sure logs directories exist
-  sudo: true
+  become: true
   file:
     path: /opt/librenms/logs
     state: directory
@@ -112,8 +112,8 @@
     host: "{{ librenms_db.db_host}}"
 
 - name: Initialise the database
-  sudo: yes
-  sudo_user: librenms
+  become: yes
+  become_user: librenms
   args:
     chdir: /opt/librenms
   command: php build-base.php
@@ -151,24 +151,24 @@
 #################
 
 - name: add an admin user
-  sudo: yes
-  sudo_user: librenms
+  become: yes
+  become_user: librenms
   args:
     chdir: /opt/librenms
   shell: php adduser.php {{item.username}} {{item.password}} {{item.level}} {{item.email}}
   with_items: librenms_user
 
 - name: add hosts
-  sudo: yes
-  sudo_user: librenms
+  become: yes
+  become_user: librenms
   args:
     chdir: /opt/librenms
   shell: php addhost.php {{item.fqdn}} {{item.community}} {{item.snmp_version}}
   with_items: librenms_hosts
 
 - name: launch discovery
-  sudo: yes
-  sudo_user: librenms
+  become: yes
+  become_user: librenms
   args:
     chdir: /opt/librenms
   shell: php discovery.php -h all
