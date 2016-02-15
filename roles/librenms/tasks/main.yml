@@ -125,7 +125,7 @@
 #################
 
 - name: Add apache vhost configuration
-  copy:
+  template:
     src: etc/apache2/sites-available/librenms.conf
     dest: /etc/apache2/sites-available/librenms.conf
     owner: root
